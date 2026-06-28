@@ -1,87 +1,92 @@
-*&---------------------------------------------------------------------*
-*& Report YDEMO_R3
-*&---------------------------------------------------------------------*
-*&
-*&---------------------------------------------------------------------*
-report ydemo_r3.
+*-----------------------------------------------------------------------
+* Program : ZTEXTPOOL_SEARCH
+* Purpose : Search Text Symbols (Text Elements) across ABAP programs
+* Author  : Aravindhan Chandran
+* GitHub  : https://github.com/aravindhan2529/abap-text-symbol-search
+*-----------------------------------------------------------------------
+report ztextpool_search.
 
-data : gs_rs38m    type rs38m,
-       gs_textpool type textpool.
-selection-screen begin of block b1 with frame.
+data:
+  gv_program type rs38m-programm,
+  gv_text    type textpool-entry.
+
+selection-screen begin of block b1 with frame title text-001.
   select-options:
-    s_prog   for gs_rs38m-programm no intervals no-extension obligatory,
-    s_langu  for sy-langu          no intervals no-extension default 'EN',
-    s_search for gs_textpool-entry no intervals no-extension.
+    so_prog for gv_program no intervals no-extension obligatory,
+    so_lang    for sy-langu   no intervals no-extension default 'EN',
+    so_text    for gv_text    no intervals no-extension.
 selection-screen end of block b1.
-class cl_txt_symbol_finder definition final.
+
+class lcl_textpool_search definition final.
   public section.
     methods:
-      get_data,
-      display_alv.
+      execute,
+      display_result.
+
   private section.
-    types: begin of gty_s_tadir,
-             pgmid    type tadir-pgmid,
-             object   type tadir-object,
-             obj_name type tadir-obj_name,
-           end of gty_s_tadir.
-    types: begin of gty_s_final,
-             programm type rs38m-programm,
-             key      type textpool-key,
-             entry    type textpool-entry,
-           end of gty_s_final.
-    data: gt_texttab type table of textpool,
-          gs_texttab type textpool.
-    data: gs_tadir type gty_s_tadir,
-          gt_tadir type sorted table of gty_s_tadir
-                   with unique key pgmid object obj_name.
-    data: gs_final type gty_s_final,
-          gt_final type table of gty_s_final.
+    types:
+      begin of ty_program,
+        pgmid    type tadir-pgmid,
+        object   type tadir-object,
+        obj_name type tadir-obj_name,
+      end of ty_program.
+    types:
+      begin of ty_result,
+        program type rs38m-programm,
+        key     type textpool-key,
+        text    type textpool-entry,
+      end of ty_result.
+    data:
+      mt_programs type sorted table of ty_program
+                    with unique key pgmid object obj_name,
+      mt_textpool type standard table of textpool,
+      mt_result   type standard table of ty_result.
+
 endclass.
-class cl_txt_symbol_finder implementation.
-  method get_data.
-    clear: gt_tadir,
-           gt_final.
-    select pgmid
-           object
+
+class lcl_textpool_search implementation.
+  method execute.
+    select pgmid,
+           object,
            obj_name
       from tadir
-      into table gt_tadir
-      where obj_name in s_prog
-        and pgmid = 'R3TR'.
-    loop at gt_tadir into gs_tadir.
-      clear gt_texttab.
-      read textpool gs_tadir-obj_name
-           language s_langu-low
-           into gt_texttab
-           state 'A'.
-      loop at gt_texttab into gs_texttab
+      into table @mt_programs
+      where pgmid    = 'R3TR'
+        and obj_name in @so_prog.
+    loop at mt_programs into data(ls_program).
+      clear mt_textpool.
+      read textpool ls_program-obj_name
+        language so_lang-low
+        into mt_textpool
+        state 'A'.
+      loop at mt_textpool into data(ls_textpool)
            where id = 'I'
-             and entry cs s_search-low.
-        gs_final-programm = gs_tadir-obj_name.
-        gs_final-key      = gs_texttab-key.
-        gs_final-entry    = gs_texttab-entry.
-        append gs_final to gt_final.
+             and entry cs so_text-low.
+        append value ty_result(
+                 program = ls_program-obj_name
+                 key     = ls_textpool-key
+                 text    = ls_textpool-entry )
+          to mt_result.
       endloop.
     endloop.
   endmethod.
-  method display_alv.
-    data: lo_alv type ref to cl_salv_table.
+
+  method display_result.
     try.
         cl_salv_table=>factory(
           importing
-            r_salv_table = lo_alv
+            r_salv_table = data(lo_alv)
           changing
-            t_table      = gt_final ).
+            t_table      = mt_result ).
         lo_alv->get_functions( )->set_all( abap_true ).
         lo_alv->display( ).
-      catch cx_salv_msg into data(lx_salv).
-        message lx_salv->get_text( ) type 'I'.
+      catch cx_salv_msg into data(lx_error).
+        message lx_error->get_text( ) type 'I'.
     endtry.
   endmethod.
 endclass.
 
 start-of-selection.
-  data lo_txt_finder type ref to cl_txt_symbol_finder.
-  create object lo_txt_finder.
-  lo_txt_finder->get_data( ).
-  lo_txt_finder->display_alv( ).
+  data(lo_search) = new lcl_textpool_search( ).
+  lo_search->execute( ).
+  lo_search->display_result( ).
