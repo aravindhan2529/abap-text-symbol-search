@@ -1,7 +1,4 @@
-# ABAP Text Pool Search
-A simple ABAP utility to search program Text Elements (Text Symbols)
-using the READ TEXTPOOL statement.
-
+ABAP utility to search Text Symbols (Text Elements) across ABAP programs using the READ TEXTPOOL statement.
 ## Why?
 The standard report RPR_ABAP_SOURCE_SCAN scans ABAP source code but
 does not search Text Elements maintained in the program text pool.
