@@ -15,7 +15,6 @@ This utility searches:
 - SALV output
 
 ## Technologies
-- ABAP
 - READ TEXTPOOL
 - SALV
 
